@@ -2,7 +2,7 @@
 
 Интерактивная обучающая демонстрация Солнечной системы, созданная с использованием React, TypeScript и Tailwind CSS.
 
-https://delusion-impact.github.io/galaxy_model/
+https://delusion-impact.github.io/experiments_galaxy_model/
 
 
 ![Solar System Demo](./public/solar-system-preview.svg)
