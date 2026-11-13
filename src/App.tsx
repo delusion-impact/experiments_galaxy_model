@@ -42,6 +42,17 @@ interface ExplosionData {
   id: number;
   x: number;
   y: number;
+  fragments: ExplosionFragment[];
+}
+
+interface ExplosionFragment {
+  angle: number;
+  distance: number;
+  rotation: number;
+  width: number;
+  height: number;
+  delay: number;
+  color: string;
 }
 
 const planets: PlanetData[] = [
@@ -319,6 +330,17 @@ export default function App() {
                 id: intruder.id,
                 x: targetX,
                 y: targetY,
+                fragments: Array.from({ length: 20 }, () => ({
+                  angle: Math.random() * Math.PI * 2,
+                  distance: 45 + Math.random() * 100,
+                  rotation: (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 480),
+                  width: 3 + Math.random() * 5,
+                  height: 5 + Math.random() * 9,
+                  delay: Math.random() * 100,
+                  color: [target.color, target.glowColor, '#fff3b0', '#ffffff'][
+                    Math.floor(Math.random() * 4)
+                  ],
+                })),
               };
               const updatedDestroyed = new Set(destroyedPlanetsRef.current);
               updatedDestroyed.add(targetPlanetIndex);
@@ -723,19 +745,37 @@ export default function App() {
           {explosions.map((explosion) => (
             <div
               key={explosion.id}
-              className="absolute pointer-events-none z-30 animate-explosion"
+              className="absolute pointer-events-none z-30 planet-explosion"
               style={{
                 left: `${explosion.x}px`,
                 top: `${explosion.y}px`,
                 transform: 'translate(-50%, -50%)',
               }}
-              onAnimationEnd={() =>
+              onAnimationEnd={(event) => {
+                if (event.target !== event.currentTarget) return;
                 setExplosions((current) =>
                   current.filter((item) => item.id !== explosion.id)
-                )
-              }
+                );
+              }}
             >
-              💥
+              <div className="explosion-wave explosion-wave-primary" />
+              <div className="explosion-wave explosion-wave-secondary" />
+              <div className="explosion-flash" />
+              {explosion.fragments.map((fragment, index) => (
+                <span
+                  key={`${explosion.id}-fragment-${index}`}
+                  className="explosion-fragment"
+                  style={{
+                    '--fragment-angle': `${fragment.angle}rad`,
+                    '--fragment-distance': `${fragment.distance}px`,
+                    '--fragment-rotation': `${fragment.rotation}deg`,
+                    '--fragment-width': `${fragment.width}px`,
+                    '--fragment-height': `${fragment.height}px`,
+                    '--fragment-delay': `${fragment.delay}ms`,
+                    '--fragment-color': fragment.color,
+                  } as React.CSSProperties}
+                />
+              ))}
             </div>
           ))}
         </div>
@@ -873,7 +913,7 @@ export default function App() {
 
             <button
               onClick={createIntruder}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-rose-500/30"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-300 hover:bg-sky-200 text-slate-950 font-medium transition-all duration-200 shadow-lg hover:shadow-sky-300/30"
             >
               <span className="text-lg">🛸</span>
               Intruders

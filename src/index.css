@@ -79,24 +79,103 @@
   }
 }
 
-@keyframes explosion {
+.planet-explosion {
+  width: 1px;
+  height: 1px;
+  animation: explosion-fade 1.25s ease-out forwards;
+}
+
+.explosion-wave,
+.explosion-flash,
+.explosion-fragment {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.explosion-wave {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 246, 190, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 14px 3px rgba(255, 176, 59, 0.75);
+  animation: explosion-wave-expand 1.05s cubic-bezier(0.12, 0.6, 0.25, 1) forwards;
+}
+
+.explosion-wave-primary {
+  animation-delay: 50ms;
+}
+
+.explosion-wave-secondary {
+  border-color: rgba(125, 211, 252, 0.9);
+  box-shadow: 0 0 18px 4px rgba(56, 189, 248, 0.55);
+  animation-delay: 200ms;
+}
+
+.explosion-flash {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #fff4bd 18%, #ffad33 48%, rgba(255, 88, 24, 0) 74%);
+  box-shadow: 0 0 25px 12px rgba(255, 174, 54, 0.7);
+  animation: explosion-flash-burst 650ms ease-out forwards;
+}
+
+.explosion-fragment {
+  width: var(--fragment-width);
+  height: var(--fragment-height);
+  border-radius: 35% 65% 45% 55%;
+  background: linear-gradient(135deg, #fff8cc, var(--fragment-color) 45%, #451b18);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--fragment-color), transparent 35%);
+  animation: explosion-fragment-fly 1.1s cubic-bezier(0.15, 0.65, 0.3, 1) forwards;
+  animation-delay: var(--fragment-delay);
+}
+
+@keyframes explosion-wave-expand {
+  0% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(0.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(8);
+  }
+}
+
+@keyframes explosion-flash-burst {
   0% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(0.3);
+    transform: translate(-50%, -50%) scale(0.15);
   }
-  55% {
+  35% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1.8);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(2.4);
+    transform: translate(-50%, -50%) scale(0.45);
   }
 }
 
-.animate-explosion {
-  font-size: 2rem;
-  animation: explosion 0.65s ease-out forwards;
+@keyframes explosion-fragment-fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--fragment-angle)) translateX(0) rotate(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--fragment-angle)) translateX(var(--fragment-distance)) rotate(var(--fragment-rotation));
+  }
+}
+
+@keyframes explosion-fade {
+  0%, 75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* Custom scrollbar */
