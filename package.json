@@ -1,7 +1,7 @@
 {
   "name": "sandbox-workspace",
   "private": true,
-  "homepage": "https://delusion-impact.github.io/galaxy_model",
+  "homepage": "https://delusion-impact.github.io/experiments_galaxy_model/",
   "type": "module",
   "scripts": {
     "dev": "vite",
