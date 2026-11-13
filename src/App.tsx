@@ -24,6 +24,21 @@ interface PlanetData {
   moons: MoonData[];
 }
 
+interface IntruderData {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  turnIn: number;
+}
+
+interface ExplosionData {
+  id: number;
+  x: number;
+  y: number;
+}
+
 const planets: PlanetData[] = [
   {
     name: 'Mercury',
@@ -161,10 +176,18 @@ export default function App() {
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetData | null>(null);
   const [showMoons, setShowMoons] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [destroyedPlanets, setDestroyedPlanets] = useState<Set<number>>(
+    () => new Set()
+  );
+  const [intruders, setIntruders] = useState<IntruderData[]>([]);
+  const [explosions, setExplosions] = useState<ExplosionData[]>([]);
 
   const [angles, setAngles] = useState<number[]>(() =>
     planets.map(() => Math.random() * Math.PI * 2)
   );
+  const anglesRef = useRef(angles);
+  const destroyedPlanetsRef = useRef(destroyedPlanets);
+  const intrudersRef = useRef(intruders);
   const [moonAngles, setMoonAngles] = useState<number[]>(() =>
     Array.from({ length: totalMoonsCount }, () => Math.random() * Math.PI * 2)
   );
@@ -185,15 +208,15 @@ export default function App() {
         const EARTH_ORBIT_MS = 60000;
         const EARTH_PERIOD_DAYS = 365.25;
 
-        setAngles((prev) =>
-          prev.map((angle, i) => {
-            // Angular speed proportional to Earth: faster for inner planets, slower for outer
-            const angularSpeed =
-              ((2 * Math.PI) / EARTH_ORBIT_MS) *
-              (EARTH_PERIOD_DAYS / planets[i].orbitalPeriod);
-            return angle + angularSpeed * delta * speed;
-          })
-        );
+        const nextAngles = anglesRef.current.map((angle, i) => {
+          // Angular speed proportional to Earth: faster for inner planets, slower for outer
+          const angularSpeed =
+            ((2 * Math.PI) / EARTH_ORBIT_MS) *
+            (EARTH_PERIOD_DAYS / planets[i].orbitalPeriod);
+          return angle + angularSpeed * delta * speed;
+        });
+        anglesRef.current = nextAngles;
+        setAngles(nextAngles);
 
         // Moon (Луна) completes 1 orbit in 5 seconds at speed=1;
         // other moons are relative to that via moon.speed multiplier
@@ -218,6 +241,57 @@ export default function App() {
             return angle;
           });
         });
+
+        const elapsed = delta * speed;
+        const nextIntruders: IntruderData[] = [];
+        for (const intruder of intrudersRef.current) {
+          let { x, y, vx, vy, turnIn } = intruder;
+          turnIn -= elapsed;
+          if (turnIn <= 0) {
+            const direction =
+              Math.atan2(vy, vx) + (Math.random() - 0.5) * Math.PI * 2;
+            const velocity = 120 + Math.random() * 100;
+            vx = Math.cos(direction) * velocity;
+            vy = Math.sin(direction) * velocity;
+            turnIn = 250 + Math.random() * 550;
+          }
+
+          x += (vx * elapsed) / 1000;
+          y += (vy * elapsed) / 1000;
+          if (x < 16 || x > 904) vx *= -1;
+          if (y < 16 || y > 904) vy *= -1;
+          x = Math.max(16, Math.min(904, x));
+          y = Math.max(16, Math.min(904, y));
+
+          const hitPlanetIndex = planets.findIndex((planet, index) => {
+            if (destroyedPlanetsRef.current.has(index)) return false;
+            const planetX = 460 + Math.cos(nextAngles[index]) * planet.orbitRadius;
+            const planetY = 460 + Math.sin(nextAngles[index]) * planet.orbitRadius;
+            return Math.hypot(x - planetX, y - planetY) < planet.size + 16;
+          });
+
+          if (hitPlanetIndex !== -1) {
+            const planet = planets[hitPlanetIndex];
+            const explosion = {
+              id: intruder.id,
+              x: 460 + Math.cos(nextAngles[hitPlanetIndex]) * planet.orbitRadius,
+              y: 460 + Math.sin(nextAngles[hitPlanetIndex]) * planet.orbitRadius,
+            };
+            const updatedDestroyed = new Set(destroyedPlanetsRef.current);
+            updatedDestroyed.add(hitPlanetIndex);
+            destroyedPlanetsRef.current = updatedDestroyed;
+            setDestroyedPlanets(updatedDestroyed);
+            setSelectedPlanet((selected) =>
+              selected?.name === planet.name ? null : selected
+            );
+            setExplosions((current) => [...current, explosion]);
+            continue;
+          }
+
+          nextIntruders.push({ ...intruder, x, y, vx, vy, turnIn });
+        }
+        intrudersRef.current = nextIntruders;
+        setIntruders(nextIntruders);
       }
 
       animationRef.current = requestAnimationFrame(animate);
@@ -255,6 +329,41 @@ export default function App() {
 
   const formatNumber = (num: number): string => {
     return num.toLocaleString('ru-RU');
+  };
+
+  const createIntruder = () => {
+    const container = containerRef.current;
+    const stage = container?.parentElement;
+    const bounds = container?.getBoundingClientRect();
+    const stageBounds = stage?.getBoundingClientRect();
+    const scale = bounds && bounds.width > 0 ? bounds.width / 920 : 1;
+    const left = Math.max(bounds?.left ?? 0, stageBounds?.left ?? 0, 0);
+    const top = Math.max(bounds?.top ?? 0, stageBounds?.top ?? 0, 0);
+    const right = Math.min(
+      bounds?.right ?? 920,
+      stageBounds?.right ?? window.innerWidth,
+      window.innerWidth
+    );
+    const bottom = Math.min(
+      bounds?.bottom ?? 920,
+      stageBounds?.bottom ?? window.innerHeight,
+      window.innerHeight
+    );
+    const screenX = left + Math.random() * Math.max(0, right - left);
+    const screenY = top + Math.random() * Math.max(0, bottom - top);
+    const direction = Math.random() * Math.PI * 2;
+    const velocity = 120 + Math.random() * 100;
+    const intruder = {
+      id: Date.now() + Math.random(),
+      x: Math.max(16, Math.min(904, (screenX - (bounds?.left ?? 0)) / scale)),
+      y: Math.max(16, Math.min(904, (screenY - (bounds?.top ?? 0)) / scale)),
+      vx: Math.cos(direction) * velocity,
+      vy: Math.sin(direction) * velocity,
+      turnIn: 250 + Math.random() * 550,
+    };
+    const nextIntruders = [...intrudersRef.current, intruder];
+    intrudersRef.current = nextIntruders;
+    setIntruders(nextIntruders);
   };
 
   const stars = useRef(
@@ -405,6 +514,7 @@ export default function App() {
 
           {/* Planets with Moons */}
           {planets.map((planet, i) => {
+            if (destroyedPlanets.has(i)) return null;
             const x = Math.cos(angles[i]) * planet.orbitRadius;
             const y = Math.sin(angles[i]) * planet.orbitRadius;
             const isSelected = selectedPlanet?.name === planet.name;
@@ -488,6 +598,40 @@ export default function App() {
               </div>
             );
           })}
+
+          {intruders.map((intruder) => (
+            <div
+              key={intruder.id}
+              className="absolute pointer-events-none z-30"
+              style={{
+                left: `${intruder.x}px`,
+                top: `${intruder.y}px`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              <span className="animate-intruder block text-3xl leading-none drop-shadow-[0_0_10px_rgba(103,232,249,0.9)]">
+                🛸
+              </span>
+            </div>
+          ))}
+          {explosions.map((explosion) => (
+            <div
+              key={explosion.id}
+              className="absolute pointer-events-none z-30 animate-explosion"
+              style={{
+                left: `${explosion.x}px`,
+                top: `${explosion.y}px`,
+                transform: 'translate(-50%, -50%)',
+              }}
+              onAnimationEnd={() =>
+                setExplosions((current) =>
+                  current.filter((item) => item.id !== explosion.id)
+                )
+              }
+            >
+              💥
+            </div>
+          ))}
         </div>
       </div>
 
@@ -621,6 +765,15 @@ export default function App() {
               {showMoons ? 'Спутники: ВКЛ' : 'Спутники: ВЫКЛ'}
             </button>
 
+            <button
+              onClick={createIntruder}
+              disabled={destroyedPlanets.size === planets.length}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-rose-500/30 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              <span className="text-lg">🛸</span>
+              Intruders
+            </button>
+
             {/* Speed Control */}
             <div className="flex items-center gap-2">
               <span className="text-gray-400 text-sm">Скорость:</span>
@@ -644,28 +797,31 @@ export default function App() {
 
           {/* Planet quick-select */}
           <div className="flex flex-wrap justify-center gap-2 mt-3 pt-3 border-t border-gray-700/50">
-            {planets.map((planet) => (
-              <button
-                key={planet.name}
-                onClick={() => setSelectedPlanet(planet)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all duration-200 ${
-                  selectedPlanet?.name === planet.name
-                    ? 'bg-gray-700 text-white ring-1 ring-gray-500'
-                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white'
-                }`}
-              >
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{
-                    background: `radial-gradient(circle at 35% 35%, ${planet.color}, ${planet.glowColor})`,
-                  }}
-                />
-                {planet.nameRu}
-                {planet.moons.length > 0 && showMoons && (
-                  <span className="text-gray-500 text-[10px]">({planet.moons.length})</span>
-                )}
-              </button>
-            ))}
+            {planets.map((planet, index) => {
+              if (destroyedPlanets.has(index)) return null;
+              return (
+                <button
+                  key={planet.name}
+                  onClick={() => setSelectedPlanet(planet)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all duration-200 ${
+                    selectedPlanet?.name === planet.name
+                      ? 'bg-gray-700 text-white ring-1 ring-gray-500'
+                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      background: `radial-gradient(circle at 35% 35%, ${planet.color}, ${planet.glowColor})`,
+                    }}
+                  />
+                  {planet.nameRu}
+                  {planet.moons.length > 0 && showMoons && (
+                    <span className="text-gray-500 text-[10px]">({planet.moons.length})</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

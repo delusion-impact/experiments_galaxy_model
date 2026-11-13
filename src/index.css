@@ -15,6 +15,39 @@
   animation: fade-in 0.3s ease-out;
 }
 
+@keyframes intruder-hover {
+  0%, 100% {
+    transform: translateY(0) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(8deg);
+  }
+}
+
+.animate-intruder {
+  animation: intruder-hover 0.45s ease-in-out infinite;
+}
+
+@keyframes explosion {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.4);
+  }
+}
+
+.animate-explosion {
+  font-size: 2rem;
+  animation: explosion 0.65s ease-out forwards;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
