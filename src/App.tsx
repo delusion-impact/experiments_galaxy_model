@@ -234,8 +234,8 @@ export default function App() {
         anglesRef.current = nextAngles;
         setAngles(nextAngles);
 
-        // Moon (Луна) completes 1 orbit in 5 seconds at speed=1;
-        // other moons are relative to that via moon.speed multiplier
+        // Moon (Луна) completes 1 orbit in 5 seconds, independent of planet speed.
+        // Other moons are relative to that via moon.speed multiplier.
         const MOON_BASE_ORBIT_MS = 5000;
 
         setMoonAngles((prev) => {
@@ -249,7 +249,7 @@ export default function App() {
                   const angularSpeed =
                     ((2 * Math.PI) / MOON_BASE_ORBIT_MS) * moonMultiplier;
                   moonIdx++;
-                  return angle + angularSpeed * delta * speed;
+                  return angle + angularSpeed * delta;
                 }
                 cumIdx++;
               }
@@ -258,7 +258,7 @@ export default function App() {
           });
         });
 
-        const elapsed = delta * speed;
+        const intruderDelta = delta;
         const nextIntruders: IntruderData[] = [];
         for (const intruder of intrudersRef.current) {
           let {
@@ -292,14 +292,14 @@ export default function App() {
           }
 
           if (phase === 'segment') {
-            const segmentTime = Math.min(elapsed, phaseRemaining) / 1000;
+            const segmentTime = Math.min(intruderDelta, phaseRemaining) / 1000;
             const distance =
               intruderSpeed * segmentTime +
               0.5 * acceleration * segmentTime * segmentTime;
             x += Math.cos(heading) * distance;
             y += Math.sin(heading) * distance;
             intruderSpeed += acceleration * segmentTime;
-            phaseRemaining -= elapsed;
+            phaseRemaining -= intruderDelta;
 
             if (phaseRemaining <= 0) {
               if (segmentsRemaining > 1) {
@@ -319,11 +319,11 @@ export default function App() {
             const target = planets[targetPlanetIndex];
             const targetX = 460 + Math.cos(nextAngles[targetPlanetIndex]) * target.orbitRadius;
             const targetY = 460 + Math.sin(nextAngles[targetPlanetIndex]) * target.orbitRadius;
-            const approachStep = Math.min(1, elapsed / Math.max(1, phaseRemaining));
+            const approachStep = Math.min(1, intruderDelta / Math.max(1, phaseRemaining));
             heading = Math.atan2(targetY - y, targetX - x);
             x += (targetX - x) * approachStep;
             y += (targetY - y) * approachStep;
-            phaseRemaining -= elapsed;
+            phaseRemaining -= intruderDelta;
 
             if (phaseRemaining <= 0) {
               const explosion = {
@@ -353,11 +353,11 @@ export default function App() {
               continue;
             }
           } else if (phase === 'black-hole') {
-            const approachStep = Math.min(1, elapsed / Math.max(1, phaseRemaining));
+            const approachStep = Math.min(1, intruderDelta / Math.max(1, phaseRemaining));
             heading = Math.atan2(460 - y, 460 - x);
             x += (460 - x) * approachStep;
             y += (460 - y) * approachStep;
-            phaseRemaining -= elapsed;
+            phaseRemaining -= intruderDelta;
 
             if (phaseRemaining <= 0) {
               continue;
@@ -398,7 +398,6 @@ export default function App() {
   }, [animate]);
 
   const handleZoom = () => {
-    if (!selectedPlanet) return;
     setIsZoomed(!isZoomed);
   };
 
@@ -483,11 +482,19 @@ export default function App() {
 
   // Calculate zoom transform — computed directly from current angles
   const getZoomStyle = (): React.CSSProperties => {
-    if (!isZoomed || !selectedPlanet) {
+    if (!isZoomed) {
       return {
         width: '920px',
         height: '920px',
         transform: 'scale(1)',
+        transformOrigin: 'center center',
+      };
+    }
+    if (!selectedPlanet) {
+      return {
+        width: '920px',
+        height: '920px',
+        transform: 'scale(3.5)',
         transformOrigin: 'center center',
       };
     }
@@ -736,8 +743,31 @@ export default function App() {
                   transform: `translate(-50%, -50%) rotate(${intruder.heading}rad)`,
                 }}
               >
-                <span className="animate-intruder block text-3xl leading-none drop-shadow-[0_0_10px_rgba(103,232,249,0.9)]">
-                  🛸
+                <span className="animate-intruder block h-8 w-10 drop-shadow-[0_0_10px_rgba(103,232,249,0.9)]">
+                  <svg
+                    className="h-full w-full"
+                    viewBox="0 0 48 36"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M4 23c4-7 36-7 40 0-4 5-12 8-20 8S8 28 4 23Z"
+                      fill="#94a3b8"
+                      stroke="#e0f2fe"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M14 21c0-9 4-14 10-14s10 5 10 14"
+                      fill="#67e8f9"
+                      fillOpacity=".65"
+                      stroke="#cffafe"
+                      strokeWidth="1.5"
+                    />
+                    <path d="M8 24c8 3 24 3 32 0" stroke="#22d3ee" strokeWidth="2" />
+                    <circle cx="13" cy="24" r="1.5" fill="#ecfeff" />
+                    <circle cx="24" cy="27" r="1.5" fill="#ecfeff" />
+                    <circle cx="35" cy="24" r="1.5" fill="#ecfeff" />
+                  </svg>
                 </span>
               </div>
             </div>
@@ -867,13 +897,10 @@ export default function App() {
             {/* Zoom Button */}
             <button
               onClick={handleZoom}
-              disabled={!selectedPlanet}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-lg ${
-                selectedPlanet
-                  ? isZoomed
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white hover:shadow-amber-500/30'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-emerald-500/30'
-                  : 'bg-gray-700 text-gray-500 cursor-not-allowed shadow-none'
+                isZoomed
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white hover:shadow-amber-500/30'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-emerald-500/30'
               }`}
             >
               {isZoomed ? (
