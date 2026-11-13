@@ -28,9 +28,14 @@ interface IntruderData {
   id: number;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  turnIn: number;
+  heading: number;
+  speed: number;
+  acceleration: number;
+  targetPlanetIndex: number | null;
+  phase: 'segment' | 'approach' | 'black-hole';
+  phaseRemaining: number;
+  segmentsRemaining: number;
+  trail: { x: number; y: number }[];
 }
 
 interface ExplosionData {
@@ -245,50 +250,116 @@ export default function App() {
         const elapsed = delta * speed;
         const nextIntruders: IntruderData[] = [];
         for (const intruder of intrudersRef.current) {
-          let { x, y, vx, vy, turnIn } = intruder;
-          turnIn -= elapsed;
-          if (turnIn <= 0) {
-            const direction =
-              Math.atan2(vy, vx) + (Math.random() - 0.5) * Math.PI * 2;
-            const velocity = 120 + Math.random() * 100;
-            vx = Math.cos(direction) * velocity;
-            vy = Math.sin(direction) * velocity;
-            turnIn = 250 + Math.random() * 550;
-          }
+          let {
+            x,
+            y,
+            heading,
+            speed: intruderSpeed,
+            acceleration,
+            targetPlanetIndex,
+            phase,
+            phaseRemaining,
+            segmentsRemaining,
+            trail,
+          } = intruder;
 
-          x += (vx * elapsed) / 1000;
-          y += (vy * elapsed) / 1000;
-          if (x < 16 || x > 904) vx *= -1;
-          if (y < 16 || y > 904) vy *= -1;
-          x = Math.max(16, Math.min(904, x));
-          y = Math.max(16, Math.min(904, y));
-
-          const hitPlanetIndex = planets.findIndex((planet, index) => {
-            if (destroyedPlanetsRef.current.has(index)) return false;
-            const planetX = 460 + Math.cos(nextAngles[index]) * planet.orbitRadius;
-            const planetY = 460 + Math.sin(nextAngles[index]) * planet.orbitRadius;
-            return Math.hypot(x - planetX, y - planetY) < planet.size + 16;
-          });
-
-          if (hitPlanetIndex !== -1) {
-            const planet = planets[hitPlanetIndex];
-            const explosion = {
-              id: intruder.id,
-              x: 460 + Math.cos(nextAngles[hitPlanetIndex]) * planet.orbitRadius,
-              y: 460 + Math.sin(nextAngles[hitPlanetIndex]) * planet.orbitRadius,
-            };
-            const updatedDestroyed = new Set(destroyedPlanetsRef.current);
-            updatedDestroyed.add(hitPlanetIndex);
-            destroyedPlanetsRef.current = updatedDestroyed;
-            setDestroyedPlanets(updatedDestroyed);
-            setSelectedPlanet((selected) =>
-              selected?.name === planet.name ? null : selected
+          if (
+            targetPlanetIndex !== null &&
+            destroyedPlanetsRef.current.has(targetPlanetIndex)
+          ) {
+            targetPlanetIndex = planets.findIndex(
+              (_, index) => !destroyedPlanetsRef.current.has(index)
             );
-            setExplosions((current) => [...current, explosion]);
-            continue;
+            if (targetPlanetIndex === -1) {
+              targetPlanetIndex = null;
+              phase = 'black-hole';
+              phaseRemaining = 1600;
+            } else {
+              phase = 'approach';
+              phaseRemaining = 1100;
+            }
           }
 
-          nextIntruders.push({ ...intruder, x, y, vx, vy, turnIn });
+          if (phase === 'segment') {
+            const segmentTime = Math.min(elapsed, phaseRemaining) / 1000;
+            const distance =
+              intruderSpeed * segmentTime +
+              0.5 * acceleration * segmentTime * segmentTime;
+            x += Math.cos(heading) * distance;
+            y += Math.sin(heading) * distance;
+            intruderSpeed += acceleration * segmentTime;
+            phaseRemaining -= elapsed;
+
+            if (phaseRemaining <= 0) {
+              if (segmentsRemaining > 1) {
+                heading += (Math.random() < 0.5 ? -1 : 1) *
+                  (Math.PI * 0.55 + Math.random() * Math.PI * 0.7);
+                intruderSpeed *= 0.65;
+                segmentsRemaining -= 1;
+                phaseRemaining = 500 + Math.random() * 350;
+              } else {
+                phase = 'approach';
+                phaseRemaining = 1100;
+              }
+            }
+          }
+
+          if (phase === 'approach' && targetPlanetIndex !== null) {
+            const target = planets[targetPlanetIndex];
+            const targetX = 460 + Math.cos(nextAngles[targetPlanetIndex]) * target.orbitRadius;
+            const targetY = 460 + Math.sin(nextAngles[targetPlanetIndex]) * target.orbitRadius;
+            const approachStep = Math.min(1, elapsed / Math.max(1, phaseRemaining));
+            heading = Math.atan2(targetY - y, targetX - x);
+            x += (targetX - x) * approachStep;
+            y += (targetY - y) * approachStep;
+            phaseRemaining -= elapsed;
+
+            if (phaseRemaining <= 0) {
+              const explosion = {
+                id: intruder.id,
+                x: targetX,
+                y: targetY,
+              };
+              const updatedDestroyed = new Set(destroyedPlanetsRef.current);
+              updatedDestroyed.add(targetPlanetIndex);
+              destroyedPlanetsRef.current = updatedDestroyed;
+              setDestroyedPlanets(updatedDestroyed);
+              setSelectedPlanet((selected) =>
+                selected?.name === target.name ? null : selected
+              );
+              setExplosions((current) => [...current, explosion]);
+              continue;
+            }
+          } else if (phase === 'black-hole') {
+            const approachStep = Math.min(1, elapsed / Math.max(1, phaseRemaining));
+            heading = Math.atan2(460 - y, 460 - x);
+            x += (460 - x) * approachStep;
+            y += (460 - y) * approachStep;
+            phaseRemaining -= elapsed;
+
+            if (phaseRemaining <= 0) {
+              continue;
+            }
+          }
+
+          if (phase === 'segment') {
+            x = Math.max(16, Math.min(904, x));
+            y = Math.max(16, Math.min(904, y));
+          }
+
+          trail = [...trail, { x, y }].slice(-8);
+          nextIntruders.push({
+            ...intruder,
+            x,
+            y,
+            heading,
+            speed: intruderSpeed,
+            targetPlanetIndex,
+            phase,
+            phaseRemaining,
+            segmentsRemaining,
+            trail,
+          });
         }
         intrudersRef.current = nextIntruders;
         setIntruders(nextIntruders);
@@ -351,15 +422,27 @@ export default function App() {
     );
     const screenX = left + Math.random() * Math.max(0, right - left);
     const screenY = top + Math.random() * Math.max(0, bottom - top);
-    const direction = Math.random() * Math.PI * 2;
-    const velocity = 120 + Math.random() * 100;
+    const availablePlanets = planets
+      .map((planet, index) => ({ planet, index }))
+      .filter(({ index }) => !destroyedPlanetsRef.current.has(index));
+    const targetPlanetIndex =
+      availablePlanets.length > 0
+        ? availablePlanets[Math.floor(Math.random() * availablePlanets.length)].index
+        : null;
+    const heading = Math.random() * Math.PI * 2;
     const intruder = {
       id: Date.now() + Math.random(),
       x: Math.max(16, Math.min(904, (screenX - (bounds?.left ?? 0)) / scale)),
       y: Math.max(16, Math.min(904, (screenY - (bounds?.top ?? 0)) / scale)),
-      vx: Math.cos(direction) * velocity,
-      vy: Math.sin(direction) * velocity,
-      turnIn: 250 + Math.random() * 550,
+      heading,
+      speed: 45 + Math.random() * 30,
+      acceleration: 100 + Math.random() * 70,
+      targetPlanetIndex,
+      phase: targetPlanetIndex === null ? 'black-hole' as const : 'segment' as const,
+      phaseRemaining:
+        targetPlanetIndex === null ? 1600 : 650 + Math.random() * 450,
+      segmentsRemaining: 2 + Math.floor(Math.random() * 3),
+      trail: [],
     };
     const nextIntruders = [...intrudersRef.current, intruder];
     intrudersRef.current = nextIntruders;
@@ -599,19 +682,42 @@ export default function App() {
             );
           })}
 
-          {intruders.map((intruder) => (
+          {intruders.some((intruder) => intruder.phase === 'black-hole') && (
             <div
-              key={intruder.id}
-              className="absolute pointer-events-none z-30"
-              style={{
-                left: `${intruder.x}px`,
-                top: `${intruder.y}px`,
-                transform: 'translate(-50%, -50%)',
-              }}
+              className="absolute z-20 pointer-events-none black-hole"
+              style={{ left: '50%', top: '50%' }}
+              aria-label="Чёрная дыра"
             >
-              <span className="animate-intruder block text-3xl leading-none drop-shadow-[0_0_10px_rgba(103,232,249,0.9)]">
-                🛸
-              </span>
+              <div className="black-hole-disk" />
+              <div className="black-hole-core" />
+            </div>
+          )}
+          {intruders.map((intruder) => (
+            <div key={intruder.id}>
+              {intruder.trail.map((point, index) => (
+                <div
+                  key={`${intruder.id}-trail-${index}`}
+                  className="absolute pointer-events-none intruder-trail"
+                  style={{
+                    left: `${point.x}px`,
+                    top: `${point.y}px`,
+                    opacity: ((index + 1) / intruder.trail.length) * 0.65,
+                    transform: `translate(-50%, -50%) scale(${0.4 + (index / Math.max(1, intruder.trail.length - 1)) * 0.9})`,
+                  }}
+                />
+              ))}
+              <div
+                className="absolute pointer-events-none z-30"
+                style={{
+                  left: `${intruder.x}px`,
+                  top: `${intruder.y}px`,
+                  transform: `translate(-50%, -50%) rotate(${intruder.heading}rad)`,
+                }}
+              >
+                <span className="animate-intruder block text-3xl leading-none drop-shadow-[0_0_10px_rgba(103,232,249,0.9)]">
+                  🛸
+                </span>
+              </div>
             </div>
           ))}
           {explosions.map((explosion) => (
@@ -767,8 +873,7 @@ export default function App() {
 
             <button
               onClick={createIntruder}
-              disabled={destroyedPlanets.size === planets.length}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-rose-500/30 disabled:cursor-not-allowed disabled:shadow-none"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-rose-500/30"
             >
               <span className="text-lg">🛸</span>
               Intruders
