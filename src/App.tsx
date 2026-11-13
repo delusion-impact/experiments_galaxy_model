@@ -721,57 +721,92 @@ export default function App() {
               <div className="black-hole-core" />
             </div>
           )}
-          {intruders.map((intruder) => (
-            <div key={intruder.id}>
-              {intruder.trail.map((point, index) => (
+          {intruders.map((intruder) => {
+            const gradientPrefix = `ufo-${intruder.id.toString().replace('.', '-')}`;
+            return (
+              <div key={intruder.id}>
+                {intruder.trail.map((point, index) => (
+                  <div
+                    key={`${intruder.id}-trail-${index}`}
+                    className="absolute pointer-events-none intruder-trail"
+                    style={{
+                      left: `${point.x}px`,
+                      top: `${point.y}px`,
+                      opacity: ((index + 1) / intruder.trail.length) * 0.65,
+                      transform: `translate(-50%, -50%) scale(${0.4 + (index / Math.max(1, intruder.trail.length - 1)) * 0.9})`,
+                    }}
+                  />
+                ))}
                 <div
-                  key={`${intruder.id}-trail-${index}`}
-                  className="absolute pointer-events-none intruder-trail"
+                  className="absolute pointer-events-none z-30"
                   style={{
-                    left: `${point.x}px`,
-                    top: `${point.y}px`,
-                    opacity: ((index + 1) / intruder.trail.length) * 0.65,
-                    transform: `translate(-50%, -50%) scale(${0.4 + (index / Math.max(1, intruder.trail.length - 1)) * 0.9})`,
+                    left: `${intruder.x}px`,
+                    top: `${intruder.y}px`,
+                    transform: `translate(-50%, -50%) rotate(${intruder.heading}rad)`,
                   }}
-                />
-              ))}
-              <div
-                className="absolute pointer-events-none z-30"
-                style={{
-                  left: `${intruder.x}px`,
-                  top: `${intruder.y}px`,
-                  transform: `translate(-50%, -50%) rotate(${intruder.heading}rad)`,
-                }}
-              >
-                <span className="animate-intruder block h-8 w-10 drop-shadow-[0_0_10px_rgba(103,232,249,0.9)]">
-                  <svg
-                    className="h-full w-full"
-                    viewBox="0 0 48 36"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M4 23c4-7 36-7 40 0-4 5-12 8-20 8S8 28 4 23Z"
-                      fill="#94a3b8"
-                      stroke="#e0f2fe"
-                      strokeWidth="1.5"
-                    />
-                    <path
-                      d="M14 21c0-9 4-14 10-14s10 5 10 14"
-                      fill="#67e8f9"
-                      fillOpacity=".65"
-                      stroke="#cffafe"
-                      strokeWidth="1.5"
-                    />
-                    <path d="M8 24c8 3 24 3 32 0" stroke="#22d3ee" strokeWidth="2" />
-                    <circle cx="13" cy="24" r="1.5" fill="#ecfeff" />
-                    <circle cx="24" cy="27" r="1.5" fill="#ecfeff" />
-                    <circle cx="35" cy="24" r="1.5" fill="#ecfeff" />
-                  </svg>
-                </span>
+                >
+                  <span className="animate-intruder block h-10 w-14 drop-shadow-[0_0_12px_rgba(103,232,249,0.8)]">
+                    <svg
+                      className="h-full w-full"
+                      viewBox="0 0 64 48"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <defs>
+                        <linearGradient id={`${gradientPrefix}-hull`} x1="9" y1="20" x2="53" y2="39" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#f1f5f9" />
+                          <stop offset=".38" stopColor="#94a3b8" />
+                          <stop offset=".72" stopColor="#475569" />
+                          <stop offset="1" stopColor="#cbd5e1" />
+                        </linearGradient>
+                        <linearGradient id={`${gradientPrefix}-dome`} x1="21" y1="8" x2="44" y2="29" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#ecfeff" stopOpacity=".95" />
+                          <stop offset=".35" stopColor="#67e8f9" stopOpacity=".82" />
+                          <stop offset="1" stopColor="#0e7490" stopOpacity=".9" />
+                        </linearGradient>
+                        <radialGradient id={`${gradientPrefix}-engine`} cx="0" cy="0" r="1" gradientTransform="matrix(0 5 -19 0 32 36)" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#a5f3fc" stopOpacity=".95" />
+                          <stop offset="1" stopColor="#22d3ee" stopOpacity="0" />
+                        </radialGradient>
+                      </defs>
+
+                      <ellipse cx="32" cy="37" rx="19" ry="5" fill={`url(#${gradientPrefix}-engine)`} />
+                      <path d="M32 8V3" stroke="#bae6fd" strokeWidth="1.5" strokeLinecap="round" />
+                      <circle cx="32" cy="2.5" r="2" fill="#67e8f9" />
+                      <circle cx="32" cy="2.5" r="3.5" fill="#67e8f9" fillOpacity=".2" />
+
+                      <path
+                        d="M20 24c0-10 5-16 12-16s12 6 12 16"
+                        fill={`url(#${gradientPrefix}-dome)`}
+                        stroke="#e0f2fe"
+                        strokeWidth="1.5"
+                      />
+                      <path d="M23 20c1-5 3-8 6-10" stroke="white" strokeOpacity=".75" strokeWidth="1.5" strokeLinecap="round" />
+                      <ellipse cx="32" cy="21" rx="6" ry="5" fill="#164e63" fillOpacity=".72" />
+                      <circle cx="29.5" cy="20" r="1.2" fill="#cffafe" />
+                      <circle cx="34.5" cy="20" r="1.2" fill="#cffafe" />
+
+                      <path
+                        d="M5 26c5-6 16-10 27-10s22 4 27 10l-5 7c-7 4-14 6-22 6s-15-2-22-6l-5-7Z"
+                        fill={`url(#${gradientPrefix}-hull)`}
+                        stroke="#e2e8f0"
+                        strokeWidth="1.5"
+                      />
+                      <path d="M7 26c9 5 41 5 50 0" stroke="#f8fafc" strokeOpacity=".8" strokeWidth="1.5" />
+                      <path d="M11 31c11 4 31 4 42 0" stroke="#334155" strokeOpacity=".9" strokeWidth="1" />
+                      <path d="M13 34c6 2 11 3 19 3s13-1 19-3" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round" />
+
+                      <circle cx="13" cy="27.5" r="1.5" fill="#67e8f9" />
+                      <circle cx="21" cy="29" r="1.3" fill="#f0abfc" />
+                      <circle cx="32" cy="29.5" r="1.5" fill="#e0f2fe" />
+                      <circle cx="43" cy="29" r="1.3" fill="#f0abfc" />
+                      <circle cx="51" cy="27.5" r="1.5" fill="#67e8f9" />
+                    </svg>
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {explosions.map((explosion) => (
             <div
               key={explosion.id}
